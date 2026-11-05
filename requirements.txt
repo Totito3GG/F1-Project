@@ -1,5 +1,6 @@
-requests==2.32.3
-kafka-python==2.0.2
-pandas==2.2.2
-pyarrow==16.1.0
-python-dotenv==1.0.1
+requests>=2.32
+kafka-python>=2.1.0
+pandas>=2.2.3
+pyarrow>=18.0
+python-dotenv>=1.0
+pytest>=8.0
