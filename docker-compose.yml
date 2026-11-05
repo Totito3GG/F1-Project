@@ -29,3 +29,14 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     depends_on:
       - kafka
+
+  spark:
+    image: apache/spark:3.5.1-python3
+    container_name: spark
+    user: root
+    command: tail -f /dev/null
+    volumes:
+      - ./streaming:/opt/app/streaming
+      - ./data:/opt/app/data
+    depends_on:
+      - kafka

@@ -49,6 +49,5 @@ docs/           schémas, captures
 ```
 
 
-## Équipe
 
 Mustapha HAMDAOUI ALAOUI
