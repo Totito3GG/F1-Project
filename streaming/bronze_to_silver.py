@@ -1,44 +1,65 @@
 """
-Spark Structured Streaming : Kafka "f1.results" -> data/bronze/results (Parquet)
-Bronze = donnée brute : on garde le JSON tel quel + les métadonnées Kafka.
+Bronze -> Silver
+- parse le JSON avec un schéma explicite
+- déduplique sur la clé métier (saison-course-pilote), en gardant la version la plus récente
+- filtre les lignes invalides, ajoute des colonnes utiles
 """
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, current_date
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import col, from_json, row_number, to_date, when
+from pyspark.sql.types import (DoubleType, IntegerType, StringType,
+                               StructField, StructType)
 
-KAFKA_BOOTSTRAP = "kafka:29092"   # adresse interne Docker
-TOPIC = "f1.results"
-OUTPUT = "/opt/app/data/bronze/results"
-CHECKPOINT = "/opt/app/data/checkpoints/bronze_results"
+BRONZE = "/opt/app/data/bronze/results"
+SILVER = "/opt/app/data/silver/results"
 
-spark = SparkSession.builder.appName("f1-kafka-to-bronze").getOrCreate()
+SCHEMA = StructType([
+    StructField("season", IntegerType()),
+    StructField("round", IntegerType()),
+    StructField("race_name", StringType()),
+    StructField("circuit_id", StringType()),
+    StructField("date", StringType()),
+    StructField("driver_id", StringType()),
+    StructField("constructor_id", StringType()),
+    StructField("grid", IntegerType()),
+    StructField("position", IntegerType()),
+    StructField("points", DoubleType()),
+    StructField("laps", IntegerType()),
+    StructField("status", StringType()),
+    StructField("ingested_at", StringType()),
+])
+
+spark = SparkSession.builder.appName("f1-bronze-to-silver").getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 
-raw = (
-    spark.readStream.format("kafka")
-    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
-    .option("subscribe", TOPIC)
-    .option("startingOffsets", "earliest")
-    .load()
+bronze = spark.read.parquet(BRONZE)
+print(f"Bronze : {bronze.count()} lignes")
+
+# 1. Parsing : JSON texte -> colonnes typées
+parsed = (
+    bronze.select("key", "kafka_timestamp", from_json(col("value"), SCHEMA).alias("d"))
+    .select("key", "kafka_timestamp", "d.*")
 )
 
-bronze = raw.select(
-    col("key").cast("string").alias("key"),
-    col("value").cast("string").alias("value"),   # JSON brut, non parsé
-    col("topic"),
-    col("partition"),
-    col("offset"),
-    col("timestamp").alias("kafka_timestamp"),
-    current_date().alias("ingestion_date"),
+# 2. Déduplication : une ligne par clé, la plus récente
+w = Window.partitionBy("key").orderBy(col("kafka_timestamp").desc())
+dedup = (
+    parsed.withColumn("rn", row_number().over(w))
+    .filter(col("rn") == 1)
+    .drop("rn")
 )
 
-query = (
-    bronze.writeStream.format("parquet")
-    .option("path", OUTPUT)
-    .option("checkpointLocation", CHECKPOINT)
-    .partitionBy("ingestion_date")
-    .trigger(availableNow=True)
-    .start()
+# 3. Nettoyage + colonnes métier
+silver = (
+    dedup.filter(col("driver_id").isNotNull() & col("season").isNotNull())
+    .withColumn("race_date", to_date("date"))
+    .drop("date")
+    .withColumn("is_winner", (col("position") == 1).cast("int"))
+    .withColumn("finished",
+                when((col("status") == "Finished") | col("status").startswith("+"), 1)
+                .otherwise(0))
+    .withColumn("pit_lane_start", (col("grid") == 0).cast("int"))
 )
 
-query.awaitTermination()
-print("Bronze OK")
+silver.write.mode("overwrite").partitionBy("season").parquet(SILVER)
+print(f"Silver : {silver.count()} lignes (doublons supprimés)")
+print("Silver OK")
