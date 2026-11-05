@@ -1,0 +1,3 @@
+# Etape 2 : services a lancer avec "docker compose up -d"
+# TODO : kafka (+ kafka-ui), airflow, mlflow
+services: {}

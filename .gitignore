@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Data lake local (trop volumineux pour Git)
+data/bronze/*
+data/silver/*
+data/gold/*
+!data/**/.gitkeep
+
+# MLflow / Spark
+mlruns/
+spark-warehouse/
+checkpoints/
+
+# Airflow
+airflow/logs/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
