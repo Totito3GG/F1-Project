@@ -48,18 +48,7 @@ tests/          tests unitaires
 docs/           schémas, captures
 ```
 
-## Avancement
-
-- [x] Étape 1 : structure du projet
-- [ ] Étape 2 : Docker Compose (Kafka)
-- [ ] Étape 3 : Producer Python (API → Kafka)
-- [ ] Étape 4 : Spark (Kafka → Bronze)
-- [ ] Étape 5 : Silver / Gold
-- [ ] Étape 6 : Airflow
-- [ ] Étape 7 : Machine Learning + MLflow
-- [ ] Étape 8 : Dashboard Streamlit
-- [ ] Étape 9 : Tests + CI
 
 ## Équipe
 
-Mustapha HAMDAOUI ALAOUI · Yassir · Mohamed (EMSI Rabat)
+Mustapha HAMDAOUI ALAOUI
