@@ -19,9 +19,9 @@ TOPIC = "f1.results"
 PAGE_SIZE = 100
 
 
-def fetch_page(season, offset):
+def fetch_page(season, offset, endpoint="results"):
     """Appelle l'API pour une page, avec retry si on dépasse la limite (429)."""
-    url = f"{JOLPICA_URL}/{season}/results.json"
+    url = f"{JOLPICA_URL}/{season}/{endpoint}.json"
     for attempt in range(5):
         r = requests.get(url, params={"limit": PAGE_SIZE, "offset": offset}, timeout=30)
         if r.status_code == 429:

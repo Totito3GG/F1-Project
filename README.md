@@ -35,6 +35,34 @@ Jolpica (ex-Ergast) + OpenF1
 | Dashboard | Streamlit | Restitution |
 | Infra | Docker Compose | Lancement en une commande |
 
+## Avancement
+
+- [x] 1. Structure du projet
+- [x] 2. Kafka + Kafka UI (Docker Compose)
+- [x] 3. Producer Jolpica -> Kafka (+ tests, CI)
+- [x] 4. Spark : Kafka -> Bronze
+- [x] 5. Bronze -> Silver (parsing, dedup)
+- [x] 6. Silver -> Gold (features sans fuite)
+- [ ] 7. XGBoost + MLflow : code ecrit et teste (`ml/train.py`), a executer sur les vraies donnees
+- [ ] 7b. Temps de qualification (`producer_qualifying.py`, `qualifying_to_silver.py`) -> features `q1_gap_pct`, `q3_gap_pct`, `quali_grid_delta` ; `train.py` compare sans/avec qualifications (`--no-quali` pour les ignorer)
+- [ ] 8. Orchestration Airflow
+- [ ] 9. Dashboard Streamlit
+- [ ] 10. Producer OpenF1 (optionnel)
+
+## Demarrage rapide (Windows)
+
+Prerequis : Git, Python 3.11+, Docker Desktop lance.
+
+```powershell
+git clone https://github.com/Totito3GG/F1-Project.git
+cd F1-Project
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+```
+
+Le script cree le venv, lance les tests, demarre Kafka/Spark, regenere Bronze -> Silver -> Gold
+(environ 15 min) puis entraine le modele. Voir les runs :
+`.\.venv\Scripts\mlflow ui --backend-store-uri sqlite:///mlflow.db` puis http://localhost:5000.
+
 ## Structure du dépôt
 
 ```
@@ -45,6 +73,7 @@ data/           Data Lake local (bronze / silver / gold), non versionné
 ml/             feature engineering, entraînement, MLflow
 dashboard/      application Streamlit
 tests/          tests unitaires
+scripts/        installation Windows (setup.ps1)
 docs/           schémas, captures
 ```
 

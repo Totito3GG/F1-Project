@@ -55,7 +55,8 @@ silver = (
     .drop("date")
     .withColumn("is_winner", (col("position") == 1).cast("int"))
     .withColumn("finished",
-                when((col("status") == "Finished") | col("status").startswith("+"), 1)
+                when((col("status") == "Finished") | (col("status") == "Lapped")
+                     | col("status").startswith("+"), 1)
                 .otherwise(0))
     .withColumn("pit_lane_start", (col("grid") == 0).cast("int"))
 )
