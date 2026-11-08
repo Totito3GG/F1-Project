@@ -98,6 +98,25 @@ services:
       mlflow:
         condition: service_healthy
 
+  # ---------------------------------------------------------------- Étape 9 : dashboard Streamlit
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: dashboard
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    environment:
+      RACEFLOW_DATA: /app/data
+      MLFLOW_URL: http://mlflow:5000                               # adresse de MLflow vue depuis le conteneur
+      MLFLOW_UI_URL: http://localhost:${MLFLOW_PORT:-5001}          # lien « ouvrir dans MLflow » pour le navigateur
+    volumes:
+      - ./dashboard:/app/dashboard
+      - ./data:/app/data:ro                                         # lecture seule : le dashboard ne modifie rien
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
 volumes:
   mlflow_data:
   airflow_db:

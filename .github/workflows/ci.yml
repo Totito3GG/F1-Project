@@ -80,7 +80,7 @@ jobs:
         run: python ml/predict.py --gold "$RACEFLOW_DATA/gold/features"
 
   docker:
-    # Les images (Airflow, MLflow) se construisent et le docker-compose est valide.
+    # Les images (Airflow, MLflow, dashboard) se construisent et le docker-compose est valide.
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
@@ -89,4 +89,4 @@ jobs:
       - name: Valider docker-compose.yml
         run: docker compose config -q
       - name: Construire les images
-        run: docker compose build airflow mlflow
+        run: docker compose build airflow mlflow dashboard
