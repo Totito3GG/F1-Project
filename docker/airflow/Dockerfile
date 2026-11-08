@@ -20,4 +20,6 @@ COPY requirements.txt /tmp/requirements.txt
 # mlflow est épinglé à la version du serveur (docker/mlflow/Dockerfile) ; pyspark à celle de Spark du projet.
 RUN /opt/raceflow-venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt "mlflow==3.18.0" "pyspark==3.5.1"
 
-CMD ["/opt/airflow/start.sh"]
+# L'entrypoint officiel d'Airflow (/entrypoint) transmet la commande à « airflow ... », sauf si elle commence
+# par « bash » ou « python ». Sans « bash » devant, il lancerait « airflow /opt/airflow/start.sh » -> erreur.
+CMD ["bash", "/opt/airflow/start.sh"]
