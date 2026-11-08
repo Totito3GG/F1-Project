@@ -72,3 +72,19 @@ manches 1 à 20, et `drv_avg_pos_last5` = 7,4 = moyenne de ses 5 dernières arri
 - Les week-ends **sprint** : seules les qualifications du Grand Prix sont utilisées (pas la course sprint).
 - Le DAG du samedi recharge toutes les saisons depuis 2015 (environ 3 min) : simple et robuste, mais pas optimal.
 - Si le PC est éteint le samedi soir, lancer `ingest_historical` à la main avant la course.
+
+
+## 7. Test avec les vraies données 2026 (8 novembre 2026)
+Premier lancement de `ingest_historical` de 2015 à 2026 : **2 bugs trouvés et corrigés**.
+
+| Bug | Symptôme | Cause | Correction |
+|---|---|---|---|
+| `producer_results` plante | `TypeError: int() argument must be ... not 'NoneType'` | la grille du GP du Brésil 2026 (manche 20) est vide (`grid = null`) : l'API a publié les résultats avant la grille | `producer_results.py` : `_int()` garde une valeur vide au lieu de planter |
+| Prédiction sans grille | pour le Brésil, favori Verstappen (41 %), vainqueur Norris à 1 % : le modèle prédisait sans sa feature principale | `grid` vide pour les 22 pilotes | `silver_to_gold.py` : grille vide → place en qualification (même approximation que pour une course à venir) |
+
+Après correction : 440 résultats et 435 lignes de qualification 2026 ingérés, 20 courses 2026 dans Gold, modèle
+ré-entraîné (version 2 du registry). Le dashboard affiche « Brazilian Grand Prix » comme course déjà courue : ce soir,
+il n'y a pas de course à venir (les qualifications de Las Vegas ont lieu le 21 novembre).
+
+**Prochaine vérification :** samedi 21 novembre, 22:00 UTC, `ingest_historical` part tout seul après les
+qualifications de Las Vegas (manche 21) : le dashboard doit afficher « 🔮 Prochain GP : 2026 · manche 21 ».

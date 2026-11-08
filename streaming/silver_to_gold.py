@@ -86,8 +86,15 @@ if HAS_QUALI:
     qall = spark.read.parquet(SILVER_QUALI)
     q = qall.select("season", "round", "driver_id", "quali_position",
                     "q1_gap_pct", "q2_gap_pct", "q3_gap_pct")
+    drv = drv.join(q, ["season", "round", "driver_id"], "left")
+    # Grille absente de l'API (vu en 2026 : grille du Brésil publiée après les résultats) : on prend la place en
+    # qualification, comme pour une course à venir. Approximation : les pénalités de grille ne sont pas connues.
+    n_filled = drv.filter(col("grid").isNull() & col("quali_position").isNotNull()).count()
+    if n_filled:
+        print(f"Grille absente remplacée par la place en qualification : {n_filled} lignes")
     drv = (
-        drv.join(q, ["season", "round", "driver_id"], "left")
+        drv.withColumn("pit_lane_start", when(col("grid").isNull(), lit(0)).otherwise(col("pit_lane_start")))
+        .withColumn("grid", coalesce(col("grid"), col("quali_position")))
         # > 0 : le pilote part derriere sa place de qualification (penalite) ; null si depart des stands
         .withColumn("quali_grid_delta", when(col("grid") > 0, col("grid") - col("quali_position")))
     )
