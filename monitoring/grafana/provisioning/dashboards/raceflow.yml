@@ -1,0 +1,10 @@
+# Grafana (étape 11) : charge automatiquement les tableaux de bord du dossier /var/lib/grafana/dashboards.
+apiVersion: 1
+providers:
+  - name: raceflow
+    folder: RaceFlow
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

@@ -89,4 +89,4 @@ jobs:
       - name: Valider docker-compose.yml
         run: docker compose config -q
       - name: Construire les images
-        run: docker compose build airflow mlflow dashboard
+        run: docker compose build airflow mlflow dashboard exporter

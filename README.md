@@ -19,7 +19,7 @@ Jolpica (ex-Ergast) + OpenF1
         ▼
   Streamlit (prédictions + stats)
 
-  Airflow orchestre le tout · Docker Compose lance le tout
+  Airflow orchestre le tout · Prometheus + Grafana surveillent le tout · Docker Compose lance le tout
 ```
 
 ## Stack
@@ -33,6 +33,7 @@ Jolpica (ex-Ergast) + OpenF1
 | Orchestration | Apache Airflow | DAGs d'ingestion, transformation, entraînement |
 | ML | XGBoost, MLflow | Prédiction du vainqueur, suivi des expériences, registry des modèles |
 | Dashboard | Streamlit, Plotly | Prédictions, comparaison avec la pole, stats pilotes, verdict du modèle |
+| Monitoring | Prometheus, Grafana | Lag Kafka, durée des DAGs, drift du modèle |
 | Infra | Docker Compose | Lancement en une commande |
 
 ## Avancement
@@ -48,7 +49,7 @@ Jolpica (ex-Ergast) + OpenF1
 - [x] 8. Orchestration Airflow (5 DAGs chaînés par Datasets) + MLflow dans Docker + CI GitHub Actions, validée sur PC (`docs/ETAPE_8_AIRFLOW.md`)
 - [x] 9. Dashboard Streamlit (`docs/ETAPE_9_DASHBOARD.md`)
 - [x] 10. Prédiction du prochain GP, avant la course : chaque samedi à 22:00 UTC, après les qualifications (`docs/ETAPE_10_PROCHAIN_GP.md`)
-- [ ] 11. Monitoring Grafana : lag Kafka, durée des DAGs, drift du modèle
+- [x] 11. Monitoring Prometheus + Grafana : lag Kafka, durée des DAGs, drift du modèle (`docs/ETAPE_11_GRAFANA.md`)
 - [ ] 12. Producer OpenF1 : météo, pneus (optionnel)
 
 ## Résultat
@@ -66,7 +67,7 @@ git clone https://github.com/Totito3GG/F1-Project.git
 cd F1-Project
 copy .env.example .env
 docker compose up -d --build        # premier build : environ 15 min
-docker compose ps                   # 6 services : Up
+docker compose ps                   # 9 services : Up
 ```
 
 Puis dans Airflow (http://localhost:8081, admin / admin) : DAG `ingest_historical` → **Trigger DAG w/ config**
@@ -78,6 +79,8 @@ Puis dans Airflow (http://localhost:8081, admin / admin) : DAG `ingest_historica
 | Airflow | http://localhost:8081 | orchestration (admin / admin) |
 | MLflow | http://localhost:5001 | runs et registry du modèle |
 | Dashboard | http://localhost:8501 | prédictions et statistiques |
+| Grafana | http://localhost:3000 | monitoring du pipeline (admin / admin) |
+| Prometheus | http://localhost:9090 | métriques collectées par l'exporter (http://localhost:8000/metrics) |
 
 Sans Airflow : `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1` (venv, tests, Kafka/Spark,
 Bronze → Silver → Gold, entraînement).
@@ -93,10 +96,11 @@ airflow/dags/   DAGs d'orchestration
 data/           Data Lake local (bronze / silver / gold), non versionné
 ml/             feature engineering, entraînement, MLflow
 dashboard/      application Streamlit (app.py : affichage, data.py : calculs)
-docker/         images Airflow, MLflow, dashboard
+monitoring/     exporter Prometheus, configuration Prometheus et Grafana
+docker/         images Airflow, MLflow, dashboard, exporter
 tests/          tests unitaires
 scripts/        installation Windows (setup.ps1)
-docs/           documentation par étape (ETAPE_7, 8, 9)
+docs/           documentation par étape (ETAPE_7 à ETAPE_11)
 ```
 
 ---

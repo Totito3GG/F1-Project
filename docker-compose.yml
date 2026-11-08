@@ -78,6 +78,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/db/airflow.db
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-raceflow-dev-secret-change-me}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      # Étape 11 : API REST d'Airflow accessible avec login / mot de passe (lue par l'exporter Prometheus)
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       # utilisés par les scripts du projet lancés depuis les DAGs
       KAFKA_BOOTSTRAP: kafka:29092
       KAFKA_BOOTSTRAP_INTERNAL: kafka:29092
@@ -117,7 +119,58 @@ services:
       mlflow:
         condition: service_healthy
 
+  # ---------------------------------------------------------------- Étape 11 : monitoring Prometheus + Grafana
+  exporter:
+    build:
+      context: .
+      dockerfile: docker/exporter/Dockerfile
+    container_name: exporter
+    ports:
+      - "${EXPORTER_PORT:-8000}:8000"                              # http://localhost:8000/metrics
+    environment:
+      RACEFLOW_DATA: /app/data
+      KAFKA_BOOTSTRAP: kafka:29092
+      AIRFLOW_URL: http://airflow:8080
+      AIRFLOW_USER: admin
+      AIRFLOW_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      MLFLOW_URL: http://mlflow:5000
+    volumes:
+      - ./monitoring:/app/monitoring
+      - ./data:/app/data:ro                                         # lecture seule
+    depends_on:
+      - kafka
+      - mlflow
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - exporter
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"                               # http://localhost:3000 (admin / admin)
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/raceflow.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   mlflow_data:
   airflow_db:
   airflow_logs:
+  prometheus_data:
+  grafana_data:
