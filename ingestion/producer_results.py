@@ -34,6 +34,15 @@ def fetch_page(season, offset, endpoint="results"):
     raise RuntimeError(f"API indisponible pour {season} offset {offset}")
 
 
+def _int(value):
+    """'12' -> 12 ; absent, null ou vide -> None.
+
+    Saison 2026 : l'API renvoie parfois grid = null (donnée pas encore remplie). Avant, int(None) faisait planter
+    tout le producer ; maintenant la valeur reste vide (null), et la couche Silver / XGBoost gèrent les valeurs vides.
+    """
+    return int(value) if value not in (None, "") else None
+
+
 def flatten(race, result):
     """Transforme la réponse imbriquée de l'API en un message plat."""
     return {
@@ -44,10 +53,10 @@ def flatten(race, result):
         "date": race["date"],
         "driver_id": result["Driver"]["driverId"],
         "constructor_id": result["Constructor"]["constructorId"],
-        "grid": int(result["grid"]),
-        "position": int(result["position"]),
-        "points": float(result["points"]),
-        "laps": int(result["laps"]),
+        "grid": _int(result.get("grid")),
+        "position": _int(result.get("position")),
+        "points": float(result.get("points") or 0),
+        "laps": _int(result.get("laps")),
         "status": result["status"],
         "ingested_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

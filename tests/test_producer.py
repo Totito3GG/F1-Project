@@ -38,3 +38,15 @@ def test_flatten_ids():
 def test_flatten_has_ingestion_time():
     msg = flatten(RACE, RESULT)
     assert msg["ingested_at"].endswith("Z")
+
+
+def test_missing_values_become_none_instead_of_crashing():
+    """Saison 2026 : l'API renvoie parfois grid = null. Le producer ne doit pas planter."""
+    msg = flatten(RACE, {**RESULT, "grid": None, "laps": "", "points": None})
+    assert msg["grid"] is None and msg["laps"] is None and msg["points"] == 0.0
+    assert msg["position"] == 1
+
+
+def test_pit_lane_start_stays_zero():
+    """grid = "0" (départ des stands) reste 0 : ce n'est pas une valeur manquante."""
+    assert flatten(RACE, {**RESULT, "grid": "0"})["grid"] == 0

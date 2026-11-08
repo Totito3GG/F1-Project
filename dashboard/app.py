@@ -87,7 +87,8 @@ def race_table(race: pd.DataFrame) -> pd.DataFrame:
         "Rang prédit": t["pred_rank"],
         "Pilote": t["driver_id"].map(pretty),
         "Écurie": t["constructor_id"].map(pretty),
-        "Grille": t["grid"].map(lambda g: "stands" if g == 0 else f"{int(g)}"),
+        # grid vide (null) : donnée absente de l'API (vu en 2026) ; 0 : départ des stands
+        "Grille": t["grid"].map(lambda g: "—" if pd.isna(g) else ("stands" if g == 0 else f"{int(g)}")),
         "Probabilité": t["win_prob"].map(lambda p: f"{p:.1%}"),
         "Arrivée réelle": t["finish_position"].map(lambda p: "—" if pd.isna(p) else f"{int(p)}"),
     })
