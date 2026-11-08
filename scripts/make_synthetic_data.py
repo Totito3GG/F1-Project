@@ -26,13 +26,21 @@ def lap_time(seconds: float) -> str:
     return f"{int(minutes)}:{rest:06.3f}"
 
 
-def make_races(seasons, rounds: int = 20, seed: int = 0):
-    """Retourne (résultats, qualifications) : deux listes de dictionnaires au format des producers."""
+def make_races(seasons, rounds: int = 20, seed: int = 0, upcoming: bool = True):
+    """Retourne (résultats, qualifications) : deux listes de dictionnaires au format des producers.
+
+    upcoming=True (étape 10) : la dernière saison a une manche de plus, avec ses qualifications mais SANS résultats,
+    comme un samedi soir avant la course. Gold doit en faire des lignes « course à venir ».
+    """
     rng = np.random.default_rng(seed)
     skill = rng.normal(0, 1, len(DRIVERS))
     results, quali = [], []
+    seasons = list(seasons)
     for season in seasons:
-        for rnd in range(1, rounds + 1):
+        n_rounds = rounds + 1 if (upcoming and season == seasons[-1]) else rounds
+        for rnd in range(1, n_rounds + 1):
+            race_info = {"race_name": f"Grand Prix {rnd}", "circuit_id": f"circuit_{rnd % 5}",
+                         "race_date": f"{season}-{(rnd - 1) // 2 + 1:02d}-{(rnd % 2) * 14 + 1:02d}"}
             form = skill + rng.normal(0, 0.4, len(DRIVERS))
             order = np.argsort(-(form + rng.normal(0, 0.6, len(DRIVERS))))   # classement des qualifications
             base = 85 + (rnd % 5) * 3                                        # un "circuit" par manche
@@ -44,19 +52,21 @@ def make_races(seasons, rounds: int = 20, seed: int = 0):
                 t2 = t1 - 0.4 if pos <= 15 else None
                 t3 = t1 - 0.8 if pos <= 10 else None
                 quali.append({
-                    "season": season, "round": rnd, "driver_id": DRIVERS[d], "constructor_id": TEAMS[d // 2],
+                    "season": season, "round": rnd, **race_info,
+                    "driver_id": DRIVERS[d], "constructor_id": TEAMS[d // 2],
                     "quali_position": pos, "q1": lap_time(t1),
                     "q2": lap_time(t2) if t2 else None, "q3": lap_time(t3) if t3 else None,
                     "ingested_at": "2020-01-01T00:00:00Z",
                 })
+            if rnd > rounds:
+                continue                                                     # course à venir : pas de résultats
             for place, d in enumerate(finish_order, start=1):
                 dnf = rng.random() < 0.06 and place > 3
                 lapped = (not dnf) and place > 14
                 grid = 0 if rng.random() < 0.02 else grid_of[int(d)]         # départ des stands
                 results.append({
-                    "season": season, "round": rnd, "race_name": f"Grand Prix {rnd}",
-                    "circuit_id": f"circuit_{rnd % 5}",
-                    "date": f"{season}-{(rnd - 1) // 2 + 3:02d}-{(rnd % 2) * 14 + 1:02d}",
+                    "season": season, "round": rnd, "race_name": race_info["race_name"],
+                    "circuit_id": race_info["circuit_id"], "date": race_info["race_date"],
                     "driver_id": DRIVERS[d], "constructor_id": TEAMS[d // 2], "grid": int(grid),
                     "position": int(place), "points": float(POINTS.get(place, 0)) if not dnf else 0.0,
                     "laps": 55 if not dnf else 20, "status": "Retired" if dnf else ("Lapped" if lapped else "Finished"),

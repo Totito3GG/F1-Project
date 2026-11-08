@@ -45,12 +45,22 @@ def test_duplicates_and_empty_feature_are_reported():
 
 
 def test_synthetic_races_have_one_winner_and_matching_quali():
-    results, quali = make_races([2020], rounds=3)
+    results, quali = make_races([2020], rounds=3, upcoming=False)
     df = pd.DataFrame(results)
     assert df.groupby("round")["position"].min().eq(1).all()
     assert df.groupby("round")["driver_id"].nunique().eq(20).all()
     assert len(quali) == len(results)
     assert {q["quali_position"] for q in quali if q["round"] == 1} == set(range(1, 21))
+
+
+def test_synthetic_upcoming_race_has_qualifying_but_no_results():
+    """Étape 10 : la dernière saison a une manche de plus, qualifiée mais pas encore courue."""
+    results, quali = make_races([2019, 2020], rounds=3)
+    assert {r["round"] for r in results if r["season"] == 2020} == {1, 2, 3}
+    assert {q["round"] for q in quali if q["season"] == 2020} == {1, 2, 3, 4}
+    assert {q["round"] for q in quali if q["season"] == 2019} == {1, 2, 3}       # saisons passées : complètes
+    upcoming = [q for q in quali if q["season"] == 2020 and q["round"] == 4]
+    assert len(upcoming) == 20 and all(q["race_name"] and q["circuit_id"] and q["race_date"] for q in upcoming)
 
 
 def test_synthetic_bronze_adds_duplicates_with_kafka_columns():

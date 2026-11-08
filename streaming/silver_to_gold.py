@@ -5,7 +5,7 @@ Toutes les fenêtres s'arrêtent à la course précédente (-1) : pas de fuite d
 import os
 
 from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import avg, coalesce, col, lit, when
+from pyspark.sql.functions import avg, coalesce, col, lit, to_date, when
 from pyspark.sql.functions import count as _count
 from pyspark.sql.functions import max as _max
 from pyspark.sql.functions import sum as _sum
@@ -18,7 +18,34 @@ GOLD = f"{DATA}/gold/features"
 spark = SparkSession.builder.appName("f1-silver-to-gold").getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 
-s = spark.read.parquet(SILVER).withColumn("race_idx", col("season") * 100 + col("round"))
+s = (spark.read.parquet(SILVER)
+     .withColumn("race_idx", col("season") * 100 + col("round"))
+     .withColumn("is_upcoming", lit(0)))
+
+# ---------- Étape 10 : lignes « course à venir » ----------
+# Le samedi soir, les qualifications d'une course existent déjà, mais pas ses résultats. Pour chaque course qui a des
+# qualifications et qui vient APRÈS la dernière course courue, on crée une ligne par pilote : grille = place en
+# qualification (les pénalités de grille ne sont pas encore connues), résultat vide (is_winner = null).
+# Les fenêtres ci-dessous s'arrêtent toutes à la course précédente (-1) : les features de ces lignes sont calculées
+# exactement comme celles d'une course passée, sans fuite possible.
+if os.path.exists(SILVER_QUALI):
+    last_done = s.agg(_max("race_idx")).first()[0]
+    qa = spark.read.parquet(SILVER_QUALI).withColumn("race_idx", col("season") * 100 + col("round"))
+    for c in ("race_name", "circuit_id", "race_date"):        # absentes des Silver produits avant l'étape 10
+        if c not in qa.columns:
+            qa = qa.withColumn(c, lit(None).cast("string"))
+    upcoming = (
+        qa.filter(col("race_idx") > last_done)
+        .select("season", "round", "race_idx", "race_name", "circuit_id",
+                to_date("race_date").alias("race_date"), "driver_id", "constructor_id",
+                col("quali_position").alias("grid"))
+        .withColumn("pit_lane_start", lit(0))
+        .withColumn("is_upcoming", lit(1))
+    )
+    races = sorted(r.race_idx for r in upcoming.select("race_idx").distinct().collect())
+    if races:
+        print(f"Course(s) à venir (qualifications sans résultats) : {races}")
+        s = s.unionByName(upcoming, allowMissingColumns=True)
 
 # ---------- Features pilote ----------
 wd = Window.partitionBy("driver_id").orderBy("race_idx")
@@ -108,11 +135,14 @@ gold = full.select(
     *QUALI_COLS,
     # cible + etiquettes d'evaluation (post-course : ne pas utiliser comme features)
     "is_winner", "is_podium", col("position").alias("finish_position"),
+    # étape 10 : 1 = course pas encore courue (cible vide), à prédire ; 0 = course courue
+    "is_upcoming",
 )
 
 gold.write.mode("overwrite").partitionBy("season").parquet(GOLD)
 n = gold.count()
 print(f"Gold : {n} lignes, {len(gold.columns)} colonnes")
+print(f"  dont lignes de course à venir : {gold.filter(col('is_upcoming') == 1).count()}")
 if HAS_QUALI:
     print(f"  qualifications jointes : {gold.filter(col('q1_gap_pct').isNotNull()).count()} / {n} lignes")
 print("Gold OK")

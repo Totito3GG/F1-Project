@@ -52,6 +52,13 @@ def pretty(identifier) -> str:
     return identifier.replace("_", " ").title()
 
 
+def is_upcoming_race(preds: pd.DataFrame) -> bool:
+    """True si la course prédite n'est pas encore courue (étape 10) : pas de résultat, ou is_upcoming = 1."""
+    if "is_upcoming" in preds.columns:
+        return bool((preds["is_upcoming"] == 1).any())
+    return bool(preds["is_winner"].isna().all())         # prédictions produites avant l'étape 10
+
+
 # ------------------------------------------------------------------ évaluation course par course
 def race_summary(preds: pd.DataFrame) -> pd.DataFrame:
     """Une ligne par course : favori du modèle, poleman, vrai vainqueur, et qui avait raison.
@@ -93,8 +100,14 @@ def season_scores(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------ statistiques pilotes (table Gold)
+def completed(gold: pd.DataFrame) -> pd.DataFrame:
+    """Courses déjà courues seulement : la course à venir (étape 10) n'a pas de résultat à compter."""
+    return gold[gold["is_upcoming"] != 1] if "is_upcoming" in gold.columns else gold
+
+
 def driver_stats(gold: pd.DataFrame, season: int) -> pd.DataFrame:
     """Statistiques des pilotes sur une saison : courses, victoires, podiums, poles, positions moyennes."""
+    gold = completed(gold)
     s = gold[gold["season"] == season]
     stats = (s.groupby("driver_id")
              .agg(ecurie=("constructor_id", "last"),
@@ -114,6 +127,7 @@ def driver_history(gold: pd.DataFrame, driver_id: str, season: int) -> pd.DataFr
 
     grid = 0 (départ des stands) devient vide : sinon la courbe l'afficherait au-dessus de la pole.
     """
+    gold = completed(gold)
     d = gold[(gold["season"] == season) & (gold["driver_id"] == driver_id)]
     d = d.sort_values("round")[["round", "race_name", "grid", "finish_position"]].reset_index(drop=True)
     d["grid"] = d["grid"].where(d["grid"] > 0)

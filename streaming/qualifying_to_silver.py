@@ -20,6 +20,9 @@ SILVER = f"{DATA}/silver/qualifying"
 SCHEMA = StructType([
     StructField("season", IntegerType()),
     StructField("round", IntegerType()),
+    StructField("race_name", StringType()),     # étape 10 : nom, circuit et date de la course,
+    StructField("circuit_id", StringType()),    # pour créer les lignes d'une course pas encore courue
+    StructField("race_date", StringType()),     # (absents des messages plus anciens : null)
     StructField("driver_id", StringType()),
     StructField("constructor_id", StringType()),
     StructField("quali_position", IntegerType()),
@@ -69,7 +72,7 @@ for q in ("q1", "q2", "q3"):
     )
 
 silver = silver.select(
-    "season", "round", "driver_id", "constructor_id", "quali_position",
+    "season", "round", "race_name", "circuit_id", "race_date", "driver_id", "constructor_id", "quali_position",
     "q1_s", "q2_s", "q3_s", "q1_gap_pct", "q2_gap_pct", "q3_gap_pct",
 )
 

@@ -24,10 +24,17 @@ def _time(value):
 
 
 def flatten_qualifying(race, result):
-    """Transforme la réponse imbriquée de l'API en un message plat."""
+    """Transforme la réponse imbriquée de l'API en un message plat.
+
+    race_name, circuit_id et race_date (étape 10) permettent de créer les lignes d'une course pas encore courue :
+    le samedi soir, ses qualifications existent déjà, mais pas ses résultats.
+    """
     return {
         "season": int(race["season"]),
         "round": int(race["round"]),
+        "race_name": race.get("raceName"),
+        "circuit_id": race.get("Circuit", {}).get("circuitId"),
+        "race_date": race.get("date"),
         "driver_id": result["Driver"]["driverId"],
         "constructor_id": result["Constructor"]["constructorId"],
         "quali_position": int(result["position"]),

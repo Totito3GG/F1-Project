@@ -48,17 +48,30 @@ PODIUM = "is_podium"
 LABEL_COLS = [TARGET, PODIUM, "finish_position"]
 
 
-def load_gold(path=GOLD_PATH) -> pd.DataFrame:
-    """Lit la table Gold (partitionnee par season) et remet les bons types."""
+UPCOMING = "is_upcoming"   # etape 10 : 1 = course pas encore courue (cible vide), 0 = course courue
+
+
+def load_gold(path=GOLD_PATH, include_upcoming: bool = False) -> pd.DataFrame:
+    """Lit la table Gold (partitionnee par season) et remet les bons types.
+
+    Par defaut, seulement les courses COURUES (cible connue) : c'est ce qu'il faut pour entrainer, evaluer et
+    controler la qualite. include_upcoming=True garde aussi les courses a venir (cible vide) : pour predict.py.
+    """
     df = pd.read_parquet(path)
     # la colonne de partition revient en "category" : on la remet en int
     df["season"] = df["season"].astype(int)
     df["race_idx"] = df["race_idx"].astype(int)
     cols = BASE_FEATURES + [c for c in QUALI_FEATURES + EXTRA_FEATURES if c in df.columns]
     df[cols] = df[cols].astype(float)  # NaN geres nativement par XGBoost
-    df[TARGET] = df[TARGET].astype(int)
-    if PODIUM in df.columns:
-        df[PODIUM] = df[PODIUM].astype(int)
+    # Gold produit avant l'etape 10 : pas de colonne is_upcoming, toutes les courses sont courues
+    df[UPCOMING] = df[UPCOMING].fillna(0).astype(int) if UPCOMING in df.columns else 0
+    if include_upcoming:
+        df[TARGET] = df[TARGET].astype(float)  # NaN pour les courses a venir
+    else:
+        df = df[df[UPCOMING] == 0].copy()
+        df[TARGET] = df[TARGET].astype(int)
+        if PODIUM in df.columns:
+            df[PODIUM] = df[PODIUM].astype(int)
     return df.sort_values(["race_idx", "grid"]).reset_index(drop=True)
 
 

@@ -59,6 +59,7 @@ Tests : `pytest tests/test_dashboard_data.py -q` (7 tests) et `ruff check .`.
   L'intervalle contient 0 : le modèle ne bat pas la pole de façon prouvée (bandeau jaune).
 
 ## 7. Limites
-- La « prédiction » porte sur la dernière course de Gold, déjà courue (même limite que `predict_next_race`).
+- La « prédiction » portait sur la dernière course de Gold, déjà courue : corrigé à l'étape 10
+  (`docs/ETAPE_10_PROCHAIN_GP.md`), le dashboard affiche maintenant le prochain GP après les qualifications.
 - Le cache de 60 s : après un nouveau run du pipeline, recharger la page au bout d'une minute.
 - Pas d'authentification : le dashboard est fait pour un usage local.

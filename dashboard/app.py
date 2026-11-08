@@ -1,8 +1,9 @@
 """
-RaceFlow : dashboard Streamlit (étape 9).
+RaceFlow : dashboard Streamlit (étapes 9 et 10).
 
 4 onglets :
-    Prédiction   probabilités de victoire de chaque pilote pour la dernière course prédite (ml/predict.py)
+    Prédiction   probabilités de victoire de chaque pilote pour le prochain GP, avant la course (étape 10),
+                 ou pour la dernière course courue s'il n'y a pas de course à venir (ml/predict.py)
     Historique   le modèle face à la règle « le poleman gagne », course par course, sur les saisons de test
     Pilotes      statistiques par saison tirées de la table Gold
     Modèle       métriques du dernier entraînement, lues dans MLflow
@@ -27,6 +28,7 @@ from dashboard.data import (  # noqa: E402
     TEST_PATH,
     driver_history,
     driver_stats,
+    is_upcoming_race,
     latest_run,
     pretty,
     race_label,
@@ -65,7 +67,8 @@ def proba_chart(race: pd.DataFrame, top: int = 10):
     """Barres horizontales : probabilité de victoire des `top` premiers pilotes, vainqueur réel en rouge."""
     d = race.sort_values("win_prob", ascending=False).head(top).copy()
     d["pilote"] = d["driver_id"].map(pretty)
-    d["résultat"] = d["is_winner"].map({1: "Vainqueur réel", 0: "Autres"}) if "is_winner" in d else "Autres"
+    # course à venir (étape 10) : is_winner vide -> tous en gris
+    d["résultat"] = d["is_winner"].fillna(0).map({1: "Vainqueur réel", 0: "Autres"}) if "is_winner" in d else "Autres"
     fig = px.bar(d, x="win_prob", y="pilote", orientation="h", color="résultat",
                  color_discrete_map={"Vainqueur réel": WINNER_COLOR, "Autres": OTHER_COLOR},
                  text=d["win_prob"].map(lambda p: f"{p:.0%}"),
@@ -73,6 +76,7 @@ def proba_chart(race: pd.DataFrame, top: int = 10):
     fig.update_layout(yaxis={"categoryorder": "total ascending"}, xaxis_tickformat=".0%",
                       height=40 * len(d) + 120, margin={"l": 0, "r": 0, "t": 10, "b": 0}, legend_title="")
     fig.update_traces(textposition="outside", cliponaxis=False)
+    fig.update_layout(showlegend=d["résultat"].nunique() > 1)   # course à venir : pas de légende
     return fig
 
 
@@ -102,26 +106,37 @@ with tab_pred:
         missing("prédictions de la dernière course", "predict_next_race")
     else:
         head = latest.iloc[0]
-        st.subheader(race_label(head["season"], head["round"], head["race_name"]))
+        upcoming = is_upcoming_race(latest)
+        title = race_label(head["season"], head["round"], head["race_name"])
+        st.subheader(f"🔮 Prochain GP : {title}" if upcoming else title)
         st.caption(f"Modèle `raceflow-winner-xgb` version {int(head['model_version'])} (registry MLflow)")
 
         favori = latest.loc[latest["pred_rank"] == 1].iloc[0]
-        winner = latest.loc[latest["is_winner"] == 1, "driver_id"]
         pole = latest.loc[latest["grid"] == 1, "driver_id"]
         c1, c2, c3 = st.columns(3)
         c1.metric("Favori du modèle", pretty(favori["driver_id"]), f"{favori['win_prob']:.0%} de chances",
                   delta_color="off")
-        c2.metric("Poleman", pretty(pole.iloc[0] if len(pole) else None))
-        if len(winner):
-            ok = winner.iloc[0] == favori["driver_id"]
-            c3.metric("Vainqueur réel", pretty(winner.iloc[0]), "prédiction juste" if ok else "prédiction fausse",
-                      delta_color="normal" if ok else "inverse")
+        c2.metric("Pole position" if upcoming else "Poleman", pretty(pole.iloc[0] if len(pole) else None))
+        if upcoming:
+            date = pd.to_datetime(head["race_date"])
+            c3.metric("Course", "à venir", f"le {date:%d/%m/%Y}" if pd.notna(date) else None, delta_color="off")
+        else:
+            winner = latest.loc[latest["is_winner"] == 1, "driver_id"]
+            if len(winner):
+                ok = winner.iloc[0] == favori["driver_id"]
+                c3.metric("Vainqueur réel", pretty(winner.iloc[0]),
+                          "prédiction juste" if ok else "prédiction fausse",
+                          delta_color="normal" if ok else "inverse")
 
         left, right = st.columns([3, 2])
         left.plotly_chart(proba_chart(latest), width="stretch", key="chart_latest")
         right.dataframe(race_table(latest), hide_index=True, width="stretch")
-        st.caption("Limite : la course prédite est la dernière course de la table Gold, donc déjà courue. "
-                   "Prédire une course à venir demanderait les qualifications du week-end.")
+        if upcoming:
+            st.caption("Prédiction faite AVANT la course, à partir des qualifications du samedi. Grille = ordre des "
+                       "qualifications : les pénalités de grille annoncées ensuite ne sont pas prises en compte.")
+        else:
+            st.caption("Course déjà courue : aucune course à venir n'est dans la table Gold (le DAG ingest_historical "
+                       "tourne chaque samedi à 22:00 UTC, après les qualifications).")
 
 # ------------------------------------------------------------------ 2. Historique
 with tab_hist:
@@ -148,8 +163,8 @@ with tab_hist:
         fig.update_layout(yaxis_tickformat=".0%", yaxis_range=[0, 1], xaxis_type="category", height=360,
                           margin={"t": 10})
         st.plotly_chart(fig, width="stretch", key="chart_seasons")
-        st.caption("Ces chiffres portent sur les seules saisons de test. Le verdict statistique, sur 173 courses, "
-                   "est dans l'onglet Modèle.")
+        st.caption("Ces chiffres portent sur les seules saisons de test. Le verdict statistique (walk-forward, "
+                   "toutes les saisons depuis 2018) est dans l'onglet Modèle.")
 
         st.subheader("Course par course")
         labels = {r.race_idx: race_label(r.season, r["round"], r.race_name) for _, r in summary.iterrows()}
@@ -210,10 +225,12 @@ with tab_model:
     else:
         m = run["metrics"]
         st.subheader("Verdict : validation walk-forward")
+        n_wf = m.get("wf_n_races")
         st.caption(f"Dernier run « {run['run_name']} » du {run['start_time']:%d/%m/%Y %H:%M} UTC · "
                    f"[ouvrir dans MLflow]({MLFLOW_UI})")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Vainqueur trouvé par le modèle", pct(m.get("wf_winner_accuracy")))
+        c1.metric("Vainqueur trouvé par le modèle", pct(m.get("wf_winner_accuracy")),
+                  f"sur {int(n_wf)} courses" if n_wf else None, delta_color="off")
         c2.metric("Vainqueur = poleman", pct(m.get("wf_pole_baseline_accuracy")))
         diff, lo, hi = m.get("wf_diff_vs_pole"), m.get("wf_diff_ci_low"), m.get("wf_diff_ci_high")
         if diff is not None:

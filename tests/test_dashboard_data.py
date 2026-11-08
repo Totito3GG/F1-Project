@@ -3,7 +3,15 @@ import pandas as pd
 import requests
 
 from dashboard import data
-from dashboard.data import driver_history, driver_stats, pretty, race_summary, read_parquet, season_scores
+from dashboard.data import (
+    driver_history,
+    driver_stats,
+    is_upcoming_race,
+    pretty,
+    race_summary,
+    read_parquet,
+    season_scores,
+)
 
 
 def predictions() -> pd.DataFrame:
@@ -43,6 +51,12 @@ def test_driver_stats_ignores_pit_lane_start_in_average_grid():
     })
     row = driver_stats(gold, 2024).iloc[0]
     assert row["courses"] == 3 and row["victoires"] == 1 and row["podiums"] == 2
+    # étape 10 : une course à venir (pole en qualification, pas de résultat) ne compte pas
+    upcoming = {"season": 2024, "race_idx": 202404, "driver_id": "hamilton", "constructor_id": "ferrari",
+                "grid": 1, "is_winner": None, "is_podium": None, "finish_position": None, "is_upcoming": 1}
+    with_upcoming = pd.concat([gold.assign(is_upcoming=0), pd.DataFrame([upcoming])], ignore_index=True)
+    row = driver_stats(with_upcoming, 2024).iloc[0]
+    assert row["courses"] == 3 and row["poles"] == 0
     assert row["grille_moy"] == 3.0       # (2 + 4) / 2 : le départ des stands (grid = 0) n'est pas compté
     assert row["arrivee_moy"] == 5.5      # (10 + 1) / 2 : la course non classée n'est pas comptée
 
@@ -71,3 +85,12 @@ def test_latest_run_returns_none_when_mlflow_is_down(monkeypatch):
 
     monkeypatch.setattr(data.requests, "get", down)
     assert data.latest_run("http://mlflow-absent:5000") is None
+
+
+def test_is_upcoming_race():
+    """Étape 10 : course à venir si is_upcoming = 1 ; sans cette colonne, si aucun résultat n'est connu."""
+    done = predictions()
+    assert not is_upcoming_race(done)
+    assert is_upcoming_race(done.assign(is_upcoming=1, is_winner=float("nan")))
+    assert not is_upcoming_race(done.assign(is_upcoming=0))
+    assert is_upcoming_race(done.assign(is_winner=float("nan")))      # ancien format, sans is_upcoming

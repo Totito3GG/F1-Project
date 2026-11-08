@@ -1,12 +1,14 @@
 """
 Prédiction avec le modèle enregistré dans le registry MLflow (utilisé par le DAG predict_next_race).
 
-Le script prend une course de la table Gold (par défaut : la plus récente), calcule pour chaque pilote la
-probabilité de victoire et écrit le classement prédit dans data/predictions/latest_race_predictions.parquet,
-lu ensuite par le dashboard (étape 9).
+Le script prend une course de la table Gold, calcule pour chaque pilote la probabilité de victoire et écrit le
+classement prédit dans data/predictions/latest_race_predictions.parquet, lu ensuite par le dashboard (étape 9).
 
-Limite actuelle : la table Gold ne contient que des courses déjà courues. Prédire une course à venir demande de
-construire ses features à partir de la grille réelle (qualifications du samedi) : prévu pour la suite.
+Course choisie (option --race) :
+    next     (défaut) la prochaine course pas encore courue, si Gold en contient une (étape 10 : ses qualifications
+             sont connues, pas ses résultats) ; sinon la dernière course courue
+    latest   la dernière course courue
+    202405   une course précise (saison 2024, manche 5)
 
 Lancer :
     python ml/predict.py
@@ -24,7 +26,7 @@ from dotenv import load_dotenv
 from mlflow import MlflowClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ml.features import GOLD_PATH, ID_COLS, add_race_rank, load_gold  # noqa: E402
+from ml.features import GOLD_PATH, ID_COLS, UPCOMING, add_race_rank, load_gold  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_PATH = ROOT / "data" / "predictions" / "latest_race_predictions.parquet"
@@ -37,14 +39,21 @@ TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", f"sqlite:///{(ROOT / 'mlflow.db'
 def parse_args():
     p = argparse.ArgumentParser(description="RaceFlow - prédiction d'une course")
     p.add_argument("--gold", default=str(GOLD_PATH))
-    p.add_argument("--race", default="latest", help="'latest' ou un race_idx (ex. 202405 = saison 2024, manche 5)")
+    p.add_argument("--race", default="next",
+                   help="'next', 'latest' ou un race_idx (ex. 202405 = saison 2024, manche 5)")
     p.add_argument("--model-version", type=int, default=None, help="version du registry (défaut : la dernière)")
     return p.parse_args()
 
 
 def pick_race(df: pd.DataFrame, race: str) -> int:
+    """next : 1re course à venir (sinon la dernière courue) ; latest : dernière courue ; sinon un race_idx."""
+    if race == "next":
+        upcoming = df.loc[df[UPCOMING] == 1, "race_idx"]
+        if len(upcoming):
+            return int(upcoming.min())
+        race = "latest"
     if race == "latest":
-        return int(df["race_idx"].max())
+        return int(df.loc[df[UPCOMING] == 0, "race_idx"].max())
     idx = int(race)
     if idx not in set(df["race_idx"]):
         raise SystemExit(f"Course {idx} absente de la table Gold")
@@ -65,7 +74,7 @@ def main() -> None:
     model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}/{version}")
     features = list(model.get_booster().feature_names)
 
-    df = load_gold(args.gold)
+    df = load_gold(args.gold, include_upcoming=True)
     race_idx = pick_race(df, args.race)
     race = df[df["race_idx"] == race_idx].copy()
     missing = [c for c in features if c not in race.columns]
@@ -74,7 +83,7 @@ def main() -> None:
 
     race["proba"] = model.predict_proba(race[features])[:, 1]
     cols = [c for c in ID_COLS if c in race.columns]
-    extra = [c for c in ("grid", "is_winner", "finish_position") if c in race.columns]
+    extra = [c for c in ("grid", "is_winner", "finish_position", UPCOMING) if c in race.columns]
     out = add_race_rank(race)[cols + extra + ["proba", "win_prob", "pred_rank"]]
     out = out.sort_values("pred_rank")
     out["model_version"] = version
@@ -82,7 +91,8 @@ def main() -> None:
     out.to_parquet(OUT_PATH, index=False)
 
     head = out.iloc[0]
-    print(f"Course {head['race_name']} ({head['season']}, manche {head['round']}) | modèle v{version}")
+    state = "À VENIR (avant la course)" if head[UPCOMING] == 1 else "déjà courue (test sur le passé)"
+    print(f"Course {head['race_name']} ({head['season']}, manche {head['round']}) : {state} | modèle v{version}")
     print(out[["pred_rank", "driver_id", "grid", "win_prob"]].head(5).round(3).to_string(index=False))
     print(f"Prédictions -> {OUT_PATH.relative_to(ROOT)}")
     print("Predict OK")

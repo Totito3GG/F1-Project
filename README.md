@@ -47,7 +47,9 @@ Jolpica (ex-Ergast) + OpenF1
 - [x] 7b. Temps de qualification : features `q1_gap_pct`, `q3_gap_pct`, `quali_grid_delta`
 - [x] 8. Orchestration Airflow (5 DAGs chaînés par Datasets) + MLflow dans Docker + CI GitHub Actions, validée sur PC (`docs/ETAPE_8_AIRFLOW.md`)
 - [x] 9. Dashboard Streamlit (`docs/ETAPE_9_DASHBOARD.md`)
-- [ ] 10. Producer OpenF1 : météo, pneus (optionnel)
+- [x] 10. Prédiction du prochain GP, avant la course : chaque samedi à 22:00 UTC, après les qualifications (`docs/ETAPE_10_PROCHAIN_GP.md`)
+- [ ] 11. Monitoring Grafana : lag Kafka, durée des DAGs, drift du modèle
+- [ ] 12. Producer OpenF1 : météo, pneus (optionnel)
 
 ## Résultat
 
@@ -68,8 +70,7 @@ docker compose ps                   # 6 services : Up
 ```
 
 Puis dans Airflow (http://localhost:8081, admin / admin) : DAG `ingest_historical` → **Trigger DAG w/ config**
-(`start_year` 2015, `end_year` 2025). Les 4 autres DAGs s'enchaînent tout seuls (environ 10 min). Ouvrir ensuite le
-dashboard : http://localhost:8501.
+(`start_year` 2015, `end_year` = saison en cours). Les 4 autres DAGs s'enchaînent tout seuls (environ 10 min). Ouvrir ensuite le dashboard : http://localhost:8501. Ensuite, `ingest_historical` tourne tout seul chaque samedi à 22:00 UTC : après les qualifications, le dashboard affiche la prédiction du prochain GP.
 
 | Service | Adresse | Rôle |
 |---|---|---|

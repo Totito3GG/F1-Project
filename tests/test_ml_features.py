@@ -6,9 +6,11 @@ from ml.features import (
     BASE_FEATURES,
     EXTRA_FEATURES,
     QUALI_FEATURES,
+    UPCOMING,
     add_race_rank,
     available_features,
     bootstrap_diff,
+    load_gold,
     podium_accuracy,
     pole_baseline_accuracy,
     pole_hits,
@@ -137,3 +139,40 @@ def test_softmax_by_race_sums_to_one_and_keeps_order():
 def test_relevance_winner_2_podium_1():
     df = pd.DataFrame({"is_winner": [1, 0, 0], "is_podium": [1, 1, 0]})
     assert list(relevance(df)) == [2, 1, 0]
+
+
+def _gold_with_upcoming(tmp_path):
+    """Gold minimal : course 202401 courue (vainqueur connu), course 202402 à venir (cible vide)."""
+    rows = []
+    for race_idx, upcoming in ((202401, 0), (202402, 1)):
+        for i, driver in enumerate(["norris", "leclerc"]):
+            row = {c: 1.0 for c in BASE_FEATURES}
+            row.update({"season": 2024, "race_idx": race_idx, "driver_id": driver, "grid": float(i + 1),
+                        "is_winner": (1.0 if i == 0 else 0.0) if not upcoming else None,
+                        "is_podium": 1.0 if not upcoming else None, UPCOMING: upcoming})
+            rows.append(row)
+    path = tmp_path / "gold.parquet"
+    pd.DataFrame(rows).to_parquet(path)
+    return path
+
+
+def test_load_gold_keeps_only_completed_races_by_default(tmp_path):
+    """Étape 10 : entraînement, évaluation et contrôle qualité ne voient jamais la course à venir."""
+    df = load_gold(_gold_with_upcoming(tmp_path))
+    assert set(df["race_idx"]) == {202401}
+    assert df["is_winner"].dtype.kind == "i"
+
+
+def test_load_gold_can_include_the_upcoming_race(tmp_path):
+    df = load_gold(_gold_with_upcoming(tmp_path), include_upcoming=True)
+    assert set(df["race_idx"]) == {202401, 202402}
+    assert df.loc[df[UPCOMING] == 1, "is_winner"].isna().all()
+
+
+def test_load_gold_without_upcoming_column(tmp_path):
+    """Gold produit avant l'étape 10 : pas de colonne is_upcoming, tout est considéré comme couru."""
+    path = _gold_with_upcoming(tmp_path)
+    old = pd.read_parquet(path)
+    old = old[old[UPCOMING] == 0].drop(columns=UPCOMING)
+    old.to_parquet(path)
+    assert (load_gold(path)[UPCOMING] == 0).all()

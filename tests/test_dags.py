@@ -5,6 +5,7 @@ apache-airflow est installé à la même version que l'image Docker.
 """
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -60,7 +61,8 @@ def test_dags_are_chained_by_datasets(dagbag, dag_id):
 
 def test_ingest_params_and_order(dagbag):
     dag = dagbag.dags["ingest_historical"]
-    assert dag.params["start_year"] == 2015 and dag.params["end_year"] == 2025
+    assert dag.params["start_year"] == 2015
+    assert dag.params["end_year"] == datetime.now(timezone.utc).year     # étape 10 : jusqu'à la saison en cours
     assert dag.get_task("producer_results").upstream_task_ids == {"create_topics"}
     assert dag.get_task("producer_qualifying").upstream_task_ids == {"create_topics"}
     assert dag.get_task("publish_kafka_dataset").upstream_task_ids == {"producer_results", "producer_qualifying"}
@@ -95,3 +97,8 @@ def test_dags_have_tags_and_no_catchup(dagbag):
     for dag in dagbag.dags.values():
         assert "raceflow" in dag.tags
         assert dag.catchup is False
+
+
+def test_ingest_runs_every_saturday_evening(dagbag):
+    """Étape 10 : après les qualifications du samedi, avant la course du dimanche."""
+    assert dagbag.dags["ingest_historical"].schedule_interval == "0 22 * * 6"
