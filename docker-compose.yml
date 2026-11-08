@@ -41,3 +41,64 @@ services:
       - ./data:/opt/app/data
     depends_on:
       - kafka
+
+  # ---------------------------------------------------------------- Étape 8 : MLflow + Airflow
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow/Dockerfile
+    container_name: mlflow
+    ports:
+      - "${MLFLOW_PORT:-5001}:5000"      # 5001 côté PC : le port 5000 reste libre pour « mlflow ui » en local
+    # --allowed-hosts : sans lui MLflow 3.x rejette le nom « mlflow » utilisé par Airflow (erreur 403 Invalid Host header)
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --allowed-hosts mlflow:*,mlflow,localhost:*,localhost,127.0.0.1:*,127.0.0.1
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/airflow/Dockerfile
+    container_name: airflow
+    ports:
+      - "${AIRFLOW_PORT:-8081}:8080"     # 8081 : le port 8080 est pris par Kafka UI
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"   # les DAGs s'enchaînent sans les activer à la main
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/db/airflow.db
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-raceflow-dev-secret-change-me}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      # utilisés par les scripts du projet lancés depuis les DAGs
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_BOOTSTRAP_INTERNAL: kafka:29092
+      JOLPICA_URL: ${JOLPICA_URL:-https://api.jolpi.ca/ergast/f1}
+      RACEFLOW_DATA: /opt/raceflow/data
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./ingestion:/opt/raceflow/ingestion
+      - ./streaming:/opt/raceflow/streaming
+      - ./ml:/opt/raceflow/ml
+      - ./data:/opt/raceflow/data
+      - airflow_db:/opt/airflow/db
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      kafka:
+        condition: service_started
+      mlflow:
+        condition: service_healthy
+
+volumes:
+  mlflow_data:
+  airflow_db:
+  airflow_logs:

@@ -45,7 +45,7 @@ Jolpica (ex-Ergast) + OpenF1
 - [x] 6. Silver -> Gold (features sans fuite)
 - [ ] 7. XGBoost + MLflow : code ecrit et teste (`ml/train.py`), a executer sur les vraies donnees
 - [ ] 7b. Temps de qualification (`producer_qualifying.py`, `qualifying_to_silver.py`) -> features `q1_gap_pct`, `q3_gap_pct`, `quali_grid_delta` ; `train.py` compare sans/avec qualifications (`--no-quali` pour les ignorer)
-- [ ] 8. Orchestration Airflow
+- [x] 8. Orchestration Airflow (5 DAGs chaînés par Datasets) + MLflow dans docker-compose + CI GitHub Actions (voir `docs/ETAPE_8_AIRFLOW.md`)
 - [ ] 9. Dashboard Streamlit
 - [ ] 10. Producer OpenF1 (optionnel)
 

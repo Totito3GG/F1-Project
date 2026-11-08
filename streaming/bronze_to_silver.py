@@ -4,13 +4,15 @@ Bronze -> Silver
 - déduplique sur la clé métier (saison-course-pilote), en gardant la version la plus récente
 - filtre les lignes invalides, ajoute des colonnes utiles
 """
+import os
+
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import col, from_json, row_number, to_date, when
-from pyspark.sql.types import (DoubleType, IntegerType, StringType,
-                               StructField, StructType)
+from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
 
-BRONZE = "/opt/app/data/bronze/results"
-SILVER = "/opt/app/data/silver/results"
+DATA = os.getenv("RACEFLOW_DATA", "/opt/app/data")
+BRONZE = f"{DATA}/bronze/results"
+SILVER = f"{DATA}/silver/results"
 
 SCHEMA = StructType([
     StructField("season", IntegerType()),

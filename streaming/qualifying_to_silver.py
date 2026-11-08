@@ -9,9 +9,8 @@ Qualifications Bronze -> Silver
 import os
 
 from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import col, from_json, lit
+from pyspark.sql.functions import col, from_json, lit, row_number, size, split, when
 from pyspark.sql.functions import min as _min
-from pyspark.sql.functions import row_number, size, split, when
 from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 DATA = os.getenv("RACEFLOW_DATA", "/opt/app/data")

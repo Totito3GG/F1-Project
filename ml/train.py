@@ -24,11 +24,28 @@ from sklearn.metrics import log_loss, roc_auc_score
 from xgboost import XGBClassifier, XGBRanker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ml.features import (GOLD_PATH, available_features, relevance, softmax_by_race, ID_COLS, PODIUM, TARGET,  # noqa: E402
-                         add_race_rank, bootstrap_diff, load_gold, podium_accuracy,
-                         pole_baseline_accuracy, pole_hits, pole_podium_baseline,
-                         scale_pos_weight, temporal_split, topk_accuracy,
-                         walk_forward, winner_accuracy, winner_hits)
+from ml.features import (  # noqa: E402
+    GOLD_PATH,
+    ID_COLS,
+    PODIUM,
+    TARGET,
+    add_race_rank,
+    available_features,
+    bootstrap_diff,
+    load_gold,
+    podium_accuracy,
+    pole_baseline_accuracy,
+    pole_hits,
+    pole_podium_baseline,
+    relevance,
+    scale_pos_weight,
+    softmax_by_race,
+    temporal_split,
+    topk_accuracy,
+    walk_forward,
+    winner_accuracy,
+    winner_hits,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 PRED_PATH = ROOT / "data" / "predictions" / "test_predictions.parquet"
@@ -163,10 +180,10 @@ def main():
         table = []
         for label, key, cols, rk in variants:
             w = walk_forward(df, make_fit_predict(cols, rk), first_test=args.wf_from)
-            d, l, h = bootstrap_diff(winner_hits(w), pole_hits(w))
-            row = {"label": label, "acc": winner_accuracy(w), "diff": d, "lo": l, "hi": h}
+            d, lo_v, hi_v = bootstrap_diff(winner_hits(w), pole_hits(w))
+            row = {"label": label, "acc": winner_accuracy(w), "diff": d, "lo": lo_v, "hi": hi_v}
             metrics.update({f"wf_{key}_winner_accuracy": row["acc"], f"wf_{key}_diff_vs_pole": d,
-                            f"wf_{key}_diff_ci_low": l, f"wf_{key}_diff_ci_high": h})
+                            f"wf_{key}_diff_ci_low": lo_v, f"wf_{key}_diff_ci_high": hi_v})
             if PODIUM in df.columns:
                 row["podium"] = podium_accuracy(w)
                 metrics[f"wf_{key}_podium_accuracy"] = row["podium"]
