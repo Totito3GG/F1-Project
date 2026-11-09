@@ -1,7 +1,7 @@
 # Image Airflow de RaceFlow : Airflow 2.10 + Java (pour Spark) + un environnement Python séparé pour le projet.
 # Les dépendances du projet (Spark, XGBoost, MLflow...) vivent dans /opt/raceflow-venv, jamais dans l'Python d'Airflow :
 # aucun conflit de versions possible avec Airflow.
-FROM apache/airflow:2.10.5-python3.11
+FROM apache/airflow:3.3.2-python3.11
 
 USER root
 RUN apt-get update \
