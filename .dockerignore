@@ -1,0 +1,13 @@
+# Le contexte de build ne doit contenir que ce dont les images ont besoin (requirements.txt, docker/).
+.git
+.venv
+venv
+data
+mlruns
+mlartifacts
+mlflow.db
+spark-warehouse
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.env

@@ -1,0 +1,14 @@
+# Contrôle de style et d'erreurs Python (CI : job "lint").
+line-length = 120
+target-version = "py311"
+extend-exclude = [".venv", "data", "mlruns"]
+
+[lint]
+# E/W : style pycodestyle, F : erreurs réelles (imports inutilisés, noms indéfinis), I : ordre des imports
+select = ["E", "F", "W", "I"]
+
+[lint.isort]
+# les dossiers du projet (ml, ingestion...) sont des modules locaux ; raceflow_common est dans airflow/dags
+known-first-party = ["ml", "ingestion", "streaming", "scripts", "raceflow_common"]
+# le dossier airflow/ du dépôt ne doit pas être pris pour la bibliothèque Airflow
+known-third-party = ["airflow"]

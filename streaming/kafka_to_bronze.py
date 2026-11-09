@@ -1,14 +1,22 @@
 """
-Spark Structured Streaming : Kafka "f1.results" -> data/bronze/results (Parquet)
+Spark Structured Streaming : Kafka (f1.results ou f1.qualifying) -> data/bronze/<nom> (Parquet)
 Bronze = donnée brute : on garde le JSON tel quel + les métadonnées Kafka.
 """
+import os
+import sys
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_date
 
-KAFKA_BOOTSTRAP = "kafka:29092"   # adresse interne Docker
-TOPIC = "f1.results"
-OUTPUT = "/opt/app/data/bronze/results"
-CHECKPOINT = "/opt/app/data/checkpoints/bronze_results"
+# Usage : kafka_to_bronze.py [topic] [nom]   (défaut : f1.results results)
+#         kafka_to_bronze.py f1.qualifying qualifying
+# Adresse interne Docker par défaut ; surchargée par Airflow via l'environnement.
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_INTERNAL", "kafka:29092")
+DATA = os.getenv("RACEFLOW_DATA", "/opt/app/data")
+TOPIC = sys.argv[1] if len(sys.argv) > 1 else "f1.results"
+NAME = sys.argv[2] if len(sys.argv) > 2 else "results"
+OUTPUT = f"{DATA}/bronze/{NAME}"
+CHECKPOINT = f"{DATA}/checkpoints/bronze_{NAME}"
 
 spark = SparkSession.builder.appName("f1-kafka-to-bronze").getOrCreate()
 spark.sparkContext.setLogLevel("WARN")

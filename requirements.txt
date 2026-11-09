@@ -1,6 +1,12 @@
 requests>=2.32
-kafka-python>=2.1.0
+# kafka-python 3.0 a des changements incompatibles (ex. kafka.errors.NoBrokersAvailable) : on reste sur la 2.x
+kafka-python>=2.1.0,<3
 pandas>=2.2.3
 pyarrow>=18.0
 python-dotenv>=1.0
 pytest>=8.0
+
+# Etape 7 : ML
+xgboost>=2.1
+scikit-learn>=1.5
+mlflow>=2.17

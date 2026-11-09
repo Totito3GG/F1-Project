@@ -11,10 +11,14 @@ venv/
 data/bronze/*
 data/silver/*
 data/gold/*
+data/predictions/
+data/checkpoints/
 !data/**/.gitkeep
 
 # MLflow / Spark
+mlflow.db
 mlruns/
+mlartifacts/
 spark-warehouse/
 checkpoints/
 
