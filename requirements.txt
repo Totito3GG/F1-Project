@@ -1,6 +1,6 @@
 requests>=2.32
 # kafka-python 3.0 a des changements incompatibles (ex. kafka.errors.NoBrokersAvailable) : on reste sur la 2.x
-kafka-python>=2.1.0,<3
+kafka-python>=3.0.13,<4
 pandas>=2.2.3
 pyarrow>=18.0
 python-dotenv>=1.0
