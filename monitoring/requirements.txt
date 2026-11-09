@@ -1,5 +1,5 @@
 # Dépendances de l'exporter Prometheus (image Docker docker/exporter/Dockerfile)
-prometheus-client>=0.20,<1
+prometheus-client>=0.26.0,<1
 kafka-python>=2.1.0,<3
 pandas>=2.2.3
 pyarrow>=18.0
